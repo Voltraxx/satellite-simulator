@@ -220,7 +220,8 @@ class OrbitalSimulation(Simulation):
         sun = eph['sun']
 
         # get the Rotation from the rotation simulation
-        satellite_orientation = np.array(self.rotation_simulation.send_request('quaternion').result())
+        # TODO: Fixme do not update rotation_simulation simulation
+        satellite_orientation = np.array([1,1,1,1]) # np.array(self.rotation_simulation.send_request('quaternion').result())
         satellite_orientation[:3] *= -1  # conjugate
         rotation_satellite = R.from_quat(satellite_orientation)
 

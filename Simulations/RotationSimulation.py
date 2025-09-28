@@ -37,7 +37,7 @@ class RotationSimulation(Simulation):
 
     def _run_simulation(self):
         try:
-            request = self._request_queue.get(timeout=0.1)
+            request = self._request_queue.get(block=True, timeout=None)
             if request is None:
                 return
 
@@ -78,16 +78,22 @@ class RotationSimulation(Simulation):
             else:
                 print(f"Exception in OrbitalSimulation: {e}")
 
-    def update_simulation(self):
-        current_time = datetime.now()
-        time_difference = current_time - self.last_run_time
-        time_difference_seconds = time_difference.total_seconds()
+    def update_simulation(self, dt:float=None):
+        if dt is not None:
+            time_difference_seconds = dt
+        else:
+            current_time = datetime.now()
+            time_difference = current_time - self.last_run_time
+            time_difference_seconds = time_difference.total_seconds()
+            self.last_run_time = current_time
 
         if np.any(self.torque != 0):
+            # TODO: inv_moment_of_inertia must be RW inertia
             self.control_acceleration = self.inv_moment_of_inertia @ self.torque
         else:
             self.control_acceleration = np.array([0.0, 0.0, 0.0])
 
+        # self.current_rw_velocity = # TODO init to 0
         # rk4 integration for time diff lower than 1 sec
         current_ang_velocity = self.angular_velocity.copy()
         self.angular_velocity += self.runge_kutta_4(self.d_omega, current_ang_velocity, time_difference_seconds)
@@ -104,8 +110,6 @@ class RotationSimulation(Simulation):
         if self.__debug:
             print(self.quaternion, self.angular_velocity, time_difference_seconds)
             #self.__debug_plot(current_time, self.quaternion.tolist(), self.angular_velocity.tolist())
-
-        self.last_run_time = current_time
 
     def __debug_plot(self, current_time, current_quaternion, current_velocity):
         """
@@ -183,8 +187,9 @@ class RotationSimulation(Simulation):
         return q_dot
 
     def d_omega(self, x_omega_b: np.array) -> np.array:
+        # TODO: Torque was included directly into dynamic calculations, replace with a RW model.
         h_total_b = self.moment_of_inertia.dot(x_omega_b)
-        w_dot = - self.inv_moment_of_inertia @ (np.cross(x_omega_b, h_total_b))
+        w_dot = - self.inv_moment_of_inertia @ (np.cross(x_omega_b, h_total_b) - self.torque)
         return w_dot
 
     @staticmethod
